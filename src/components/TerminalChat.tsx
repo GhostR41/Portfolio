@@ -37,7 +37,7 @@ export function TerminalChat() {
           response = "Available commands: about, projects, skills, contact, secret, clear";
           break;
         case "about":
-          response = "Full Stack Developer | React • Node.js • TypeScript specialist";
+          response = "Heker";
           break;
         case "projects":
           response = "4 major projects deployed. View /projects for details.";
