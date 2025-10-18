@@ -1,10 +1,13 @@
-import { createContext, useContext, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from './AuthContext';
 
+type PortfolioContent = Record<string, any>;
+
 interface ContentSyncContextType {
-  syncContent: (key: string, value: any) => Promise<void>;
+  content: PortfolioContent;                    // Live content snapshot (no reloads)
+  syncContent: (key: string, value: any) => Promise<void>; // Owner-only: merges and updates lastUpdated
 }
 
 const ContentSyncContext = createContext<ContentSyncContextType | undefined>(undefined);
@@ -13,13 +16,12 @@ const LAST_APPLIED_KEY = 'content_last_applied';
 
 export function ContentSyncProvider({ children }: { children: ReactNode }) {
   const { isOwner } = useAuth();
+  const [content, setContent] = useState<PortfolioContent>({});
   const initializedRef = useRef(false);
-  const reloadingRef = useRef(false);
 
-  // Sync localStorage to Firestore when owner makes changes
+  // Owner: sync local changes into Firestore
   const syncContent = async (key: string, value: any) => {
-    if (!isOwner) return;
-
+    if (!isOwner) return; // SECURITY: UI check; Firestore rules still enforce
     try {
       await setDoc(
         doc(db, 'portfolio', 'content'),
@@ -34,43 +36,33 @@ export function ContentSyncProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Load content from Firestore for non-owners (no Firebase auth required if rules allow public reads)
+  // All users (owners and viewers): subscribe to content without reload loops
   useEffect(() => {
-    if (!isOwner) {
-      const unsubscribe = onSnapshot(doc(db, 'portfolio', 'content'), (snapshot) => {
-        if (!snapshot.exists()) return;
-        const data = snapshot.data();
-        const lastUpdated = typeof data.lastUpdated === 'string' ? data.lastUpdated : '';
+    const unsubscribe = onSnapshot(doc(db, 'portfolio', 'content'), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data() as PortfolioContent;
+      const { lastUpdated, ...rest } = data;
 
-        // Update localStorage with Firestore data
-        Object.entries(data).forEach(([key, value]) => {
-          if (key !== 'lastUpdated') {
-            localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-          }
-        });
+      // Update in-memory state for instant UI updates
+      setContent(rest);
 
-        // Skip the initial snapshot to avoid immediate reload
-        if (!initializedRef.current) {
-          if (lastUpdated) sessionStorage.setItem(LAST_APPLIED_KEY, lastUpdated);
-          initializedRef.current = true;
-          return;
-        }
-
-        // Reload only once when lastUpdated actually changes
-        const lastApplied = sessionStorage.getItem(LAST_APPLIED_KEY) || '';
-        if (lastUpdated && lastUpdated !== lastApplied && !reloadingRef.current) {
-          reloadingRef.current = true;
-          sessionStorage.setItem(LAST_APPLIED_KEY, lastUpdated);
-          setTimeout(() => window.location.reload(), 150);
-        }
+      // Persist to localStorage if your UI reads from there anywhere
+      Object.entries(rest).forEach(([key, value]) => {
+        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
       });
 
-      return () => unsubscribe();
-    }
-  }, [isOwner]);
+      // Initialize "last applied" once to prevent a reload loop if other code still reloads on change
+      if (!initializedRef.current && typeof lastUpdated === 'string') {
+        sessionStorage.setItem(LAST_APPLIED_KEY, lastUpdated);
+        initializedRef.current = true;
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
-    <ContentSyncContext.Provider value={{ syncContent }}>
+    <ContentSyncContext.Provider value={{ content, syncContent }}>
       {children}
     </ContentSyncContext.Provider>
   );
