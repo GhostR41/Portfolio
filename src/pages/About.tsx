@@ -55,11 +55,11 @@ export default function About() {
             <div className="space-y-4">
               <div>
                 <EditableText
-                  id="profile_designation_label"
-                  initialValue="DESIGNATION"
-                  className="text-xs text-primary mb-2"
-                  as="p"
-                />
+  id="profile_designation"
+  initialValue="Who is this?"
+  className="text-lg text-foreground"
+  as="p"
+/>
                 <EditableText
                   id="profile_designation"
                   initialValue="Full Stack Developer"
