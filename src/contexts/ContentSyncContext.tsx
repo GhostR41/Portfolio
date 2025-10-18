@@ -12,13 +12,14 @@ const ContentSyncContext = createContext<ContentSyncContextType | undefined>(und
 const LAST_APPLIED_KEY = 'content_last_applied';
 
 export function ContentSyncProvider({ children }: { children: ReactNode }) {
-  const { isOwner, authState } = useAuth();
+  const { isOwner } = useAuth();
   const initializedRef = useRef(false);
   const reloadingRef = useRef(false);
 
   // Sync localStorage to Firestore when owner makes changes
   const syncContent = async (key: string, value: any) => {
     if (!isOwner) return;
+
     try {
       await setDoc(
         doc(db, 'portfolio', 'content'),
@@ -33,11 +34,9 @@ export function ContentSyncProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Load content from Firestore for viewers
+  // Load content from Firestore for non-owners (no Firebase auth required if rules allow public reads)
   useEffect(() => {
-    // Note: This effect runs for viewers only. Ensure your Firestore read rules allow unauthenticated read
-    // if your viewer mode isn't signed in with Firebase Auth.
-    if (!authState.isOwner && authState.isAuthenticated) {
+    if (!isOwner) {
       const unsubscribe = onSnapshot(doc(db, 'portfolio', 'content'), (snapshot) => {
         if (!snapshot.exists()) return;
         const data = snapshot.data();
@@ -50,31 +49,25 @@ export function ContentSyncProvider({ children }: { children: ReactNode }) {
           }
         });
 
-        // Avoid infinite reloads:
-        // 1) Skip the initial snapshot (we just populated localStorage).
+        // Skip the initial snapshot to avoid immediate reload
         if (!initializedRef.current) {
-          if (lastUpdated) {
-            sessionStorage.setItem(LAST_APPLIED_KEY, lastUpdated);
-          }
+          if (lastUpdated) sessionStorage.setItem(LAST_APPLIED_KEY, lastUpdated);
           initializedRef.current = true;
           return;
         }
 
-        // 2) Reload only when lastUpdated actually changes and only once per update.
+        // Reload only once when lastUpdated actually changes
         const lastApplied = sessionStorage.getItem(LAST_APPLIED_KEY) || '';
         if (lastUpdated && lastUpdated !== lastApplied && !reloadingRef.current) {
           reloadingRef.current = true;
           sessionStorage.setItem(LAST_APPLIED_KEY, lastUpdated);
-          // Small delay prevents back-to-back snapshots from scheduling multiple reloads
-          setTimeout(() => {
-            window.location.reload();
-          }, 150);
+          setTimeout(() => window.location.reload(), 150);
         }
       });
 
       return () => unsubscribe();
     }
-  }, [authState.isOwner, authState.isAuthenticated]);
+  }, [isOwner]);
 
   return (
     <ContentSyncContext.Provider value={{ syncContent }}>
