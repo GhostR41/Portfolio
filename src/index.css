@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Tactical Military Dark Theme */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 100%;
+
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 17 100% 60%;
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 0 0% 27%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 53%;
+
+    --accent: 17 100% 60%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 17 100% 60% / 0.3;
+    --input: 0 0% 15%;
+    --ring: 17 100% 60%;
+
+    --radius: 0.25rem;
+
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 17 100% 60%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 17 100% 60% / 0.3;
+    --sidebar-ring: 17 100% 60%;
+
+    /* Custom tactical colors */
+    --tactical-orange: 17 100% 60%;
+    --tactical-glow: 17 100% 60% / 0.5;
+    --terminal-bg: 0 0% 4%;
+    --terminal-text: 17 100% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-mono;
+  }
+
+  /* Tactical animations */
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 5px hsl(var(--tactical-glow));
+    }
+    50% {
+      box-shadow: 0 0 20px hsl(var(--tactical-glow));
+    }
+  }
+
+  @keyframes terminal-blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .tactical-border {
+    border: 1px solid hsl(var(--border));
+  }
+
+  .tactical-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .terminal-cursor::after {
+    content: '▋';
+    animation: terminal-blink 1s step-end infinite;
+    color: hsl(var(--tactical-orange));
+  }
+
+  .slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+}
