@@ -19,7 +19,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for viewer session
+    let unsubscribe = () => {};
+
+    // Viewer session short-circuit
     const viewerSession = localStorage.getItem('viewer_session');
     if (viewerSession) {
       setAuthState({
@@ -32,10 +34,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      const state = getAuthStateFromUser(user);
-      setAuthState(state);
-      setLoading(false);
+    unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setAuthState(getAuthStateFromUser(null));
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Ensure we have latest token claims
+        const tokenResult = await user.getIdTokenResult(true);
+        const email = String(tokenResult.claims?.email || '').toLowerCase();
+        const verified = tokenResult.claims?.email_verified === true;
+
+        const isOwner = verified && email === 'pranjaysharma17@gmail.com';
+
+        setAuthState({
+          isAuthenticated: isOwner, // Only owner is "authenticated" for protected routes
+          isOwner,
+          email: user.email,
+          user
+        });
+      } catch (e) {
+        console.error('Failed to get token claims', e);
+        setAuthState(getAuthStateFromUser(null));
+      } finally {
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
