@@ -3,16 +3,19 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getAuthStateFromUser, signOut, signInAsViewer, AuthState } from '@/utils/auth';
 
+const OWNER_UID = import.meta.env.VITE_OWNER_UID as string | undefined;
+
+const VIEWER_IS_AUTHENTICATED =
+  (import.meta.env.VITE_VIEWER_IS_AUTHENTICATED || 'false').toLowerCase() === 'true';
+
 interface AuthContextType {
   authState: AuthState;
-  isOwner: boolean;              // UI only; Firestore rules enforce authZ
-  isAuthenticated: boolean;      // true if Firebase user is signed in
+  isOwner: boolean;         // UI only; not a security boundary
+  isAuthenticated: boolean; // Firebase user signed in or viewer UX (if enabled)
   loading: boolean;
   logout: () => Promise<void>;
   loginAsViewer: () => void;
 }
-
-const OWNER_UID = import.meta.env.VITE_OWNER_UID as string | undefined;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -27,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const viewerSession = localStorage.getItem('viewer_session');
     if (viewerSession) {
       setAuthState({
-        isAuthenticated: false, // not signed in to Firebase
+        isAuthenticated: VIEWER_IS_AUTHENTICATED, // UX compatibility only
         isOwner: false,
         email: null,
         user: null,
@@ -44,14 +47,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        // Refresh token to ensure latest claims; not needed for UID check, but keeps parity
+        // Force-refresh token to ensure latest claims if you add custom claims later
         await user.getIdToken(true);
 
         const isOwner = !!OWNER_UID && user.uid === OWNER_UID;
 
         setAuthState({
-          isAuthenticated: true,   // signed in
-          isOwner,                 // UI only
+          isAuthenticated: true, // signed in to Firebase
+          isOwner,               // UI only; Firestore rules enforce writes
           email: user.email,
           user,
         });
@@ -75,7 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginAsViewer = () => {
     signInAsViewer();
     setAuthState({
-      isAuthenticated: false, // viewer is not a Firebase-authenticated user
+      isAuthenticated: VIEWER_IS_AUTHENTICATED,
       isOwner: false,
       email: null,
       user: null,
