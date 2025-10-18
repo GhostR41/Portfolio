@@ -5,12 +5,14 @@ import { getAuthStateFromUser, signOut, signInAsViewer, AuthState } from '@/util
 
 interface AuthContextType {
   authState: AuthState;
-  isOwner: boolean;
-  isAuthenticated: boolean;
+  isOwner: boolean;              // UI only; Firestore rules enforce authZ
+  isAuthenticated: boolean;      // true if Firebase user is signed in
   loading: boolean;
   logout: () => Promise<void>;
   loginAsViewer: () => void;
 }
+
+const OWNER_UID = import.meta.env.VITE_OWNER_UID as string | undefined;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -21,14 +23,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let unsubscribe = () => {};
 
-    // Viewer session short-circuit
+    // Viewer session (read-only UX only; does NOT sign into Firebase)
     const viewerSession = localStorage.getItem('viewer_session');
     if (viewerSession) {
       setAuthState({
-        isAuthenticated: true,
+        isAuthenticated: false, // not signed in to Firebase
         isOwner: false,
         email: null,
-        user: null
+        user: null,
       });
       setLoading(false);
       return;
@@ -42,21 +44,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        // Ensure we have latest token claims
-        const tokenResult = await user.getIdTokenResult(true);
-        const email = String(tokenResult.claims?.email || '').toLowerCase();
-        const verified = tokenResult.claims?.email_verified === true;
+        // Refresh token to ensure latest claims; not needed for UID check, but keeps parity
+        await user.getIdToken(true);
 
-        const isOwner = verified && email === 'pranjaysharma17@gmail.com';
+        const isOwner = !!OWNER_UID && user.uid === OWNER_UID;
 
         setAuthState({
-          isAuthenticated: isOwner, // Only owner is "authenticated" for protected routes
-          isOwner,
+          isAuthenticated: true,   // signed in
+          isOwner,                 // UI only
           email: user.email,
-          user
+          user,
         });
       } catch (e) {
-        console.error('Failed to get token claims', e);
+        console.error('Failed to refresh token claims', e);
         setAuthState(getAuthStateFromUser(null));
       } finally {
         setLoading(false);
@@ -75,10 +75,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginAsViewer = () => {
     signInAsViewer();
     setAuthState({
-      isAuthenticated: true,
+      isAuthenticated: false, // viewer is not a Firebase-authenticated user
       isOwner: false,
       email: null,
-      user: null
+      user: null,
     });
   };
 
@@ -88,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAuthenticated: authState.isAuthenticated,
     loading,
     logout: handleLogout,
-    loginAsViewer
+    loginAsViewer,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
