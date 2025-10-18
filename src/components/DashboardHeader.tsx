@@ -22,8 +22,8 @@ export function DashboardHeader({
     return () => clearInterval(timer);
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();           // SECURITY/UX: await sign-out before navigating
     navigate('/login');
   };
   return (
