@@ -24,32 +24,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsubscribe = () => {};
+    // SECURITY FIX: Always subscribe to auth state changes, even in viewer mode
+    // This prevents admin lockout and ensures proper auth detection
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Check for viewer session AFTER auth state is known
+      const viewerSession = localStorage.getItem('viewer_session');
+      
+      if (!user && viewerSession) {
+        // Viewer mode: no Firebase user, but viewer session active
+        setAuthState({
+          isAuthenticated: VIEWER_IS_AUTHENTICATED, // UX flag only
+          isOwner: false,
+          email: null,
+          user: null,
+        });
+        setLoading(false);
+        return;
+      }
 
-    // Viewer session (read-only UX only; does NOT sign into Firebase)
-    const viewerSession = localStorage.getItem('viewer_session');
-    if (viewerSession) {
-      setAuthState({
-        isAuthenticated: VIEWER_IS_AUTHENTICATED, // UX compatibility only
-        isOwner: false,
-        email: null,
-        user: null,
-      });
-      setLoading(false);
-      return;
-    }
-
-    unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        // No user and no viewer session
         setAuthState(getAuthStateFromUser(null));
         setLoading(false);
         return;
       }
 
       try {
-        // Force-refresh token to ensure latest claims if you add custom claims later
+        // SECURITY: Force-refresh token to ensure latest claims
         await user.getIdToken(true);
 
+        // SECURITY: Check ownership via UID (not email)
         const isOwner = !!OWNER_UID && user.uid === OWNER_UID;
 
         setAuthState({

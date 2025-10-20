@@ -43,15 +43,16 @@ export function ContentSyncProvider({ children }: { children: ReactNode }) {
       const data = snapshot.data() as PortfolioContent;
       const { lastUpdated, ...rest } = data;
 
-      // Update in-memory state for instant UI updates
+      // SECURITY FIX: Update React state instead of triggering full page reload
+      // This prevents infinite reload loop and provides better UX
       setContent(rest);
 
-      // Persist to localStorage if your UI reads from there anywhere
+      // Persist to localStorage for components that might read from there
       Object.entries(rest).forEach(([key, value]) => {
         localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
       });
 
-      // Initialize "last applied" once to prevent a reload loop if other code still reloads on change
+      // Track initialization to prevent redundant operations
       if (!initializedRef.current && typeof lastUpdated === 'string') {
         sessionStorage.setItem(LAST_APPLIED_KEY, lastUpdated);
         initializedRef.current = true;

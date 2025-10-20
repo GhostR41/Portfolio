@@ -23,8 +23,14 @@ export function DashboardHeader({
   }, []);
 
   const handleLogout = async () => {
-    await logout();           // SECURITY/UX: await sign-out before navigating
-    navigate('/login');
+    try {
+      await logout();           // SECURITY FIX: properly await sign-out
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still navigate to login even if logout fails
+      navigate('/login');
+    }
   };
   return (
     <header className="tactical-border border-b bg-card">
