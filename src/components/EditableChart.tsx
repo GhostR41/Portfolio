@@ -5,6 +5,9 @@ import { useEditMode } from '@/contexts/EditModeContext';
 import { useContentSync } from '@/contexts/ContentSyncContext';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { githubDataSchema, codingDataSchema, chartNumberSchema } from '@/lib/validation-schemas';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 interface GitHubData {
   month: string;
@@ -48,21 +51,47 @@ export function EditableChart() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('github_chart_data', JSON.stringify(githubData));
-    syncContent('github_chart_data', githubData);
-    setHasUnsavedChanges(true);
+    // SECURITY: Validate chart data before saving
+    try {
+      z.array(githubDataSchema).parse(githubData);
+      localStorage.setItem('github_chart_data', JSON.stringify(githubData));
+      syncContent('github_chart_data', githubData);
+      setHasUnsavedChanges(true);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(`Invalid GitHub data: ${error.errors[0].message}`);
+      }
+    }
   }, [githubData, setHasUnsavedChanges, syncContent]);
 
   useEffect(() => {
-    localStorage.setItem('coding_chart_data', JSON.stringify(codingData));
-    syncContent('coding_chart_data', codingData);
-    setHasUnsavedChanges(true);
+    // SECURITY: Validate chart data before saving
+    try {
+      z.array(codingDataSchema).parse(codingData);
+      localStorage.setItem('coding_chart_data', JSON.stringify(codingData));
+      syncContent('coding_chart_data', codingData);
+      setHasUnsavedChanges(true);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(`Invalid coding data: ${error.errors[0].message}`);
+      }
+    }
   }, [codingData, setHasUnsavedChanges, syncContent]);
 
   const updateGithubPoint = (index: number, field: 'month' | 'repos', value: string) => {
     const newData = [...githubData];
     if (field === 'repos') {
-      newData[index][field] = parseInt(value) || 0;
+      // SECURITY: Validate numeric input
+      try {
+        const numValue = parseInt(value) || 0;
+        chartNumberSchema.parse(numValue);
+        newData[index][field] = numValue;
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          toast.error(`Invalid number: ${error.errors[0].message}`);
+          return;
+        }
+      }
     } else {
       newData[index][field] = value;
     }
@@ -72,7 +101,17 @@ export function EditableChart() {
   const updateCodingPoint = (index: number, field: 'platform' | 'questions', value: string) => {
     const newData = [...codingData];
     if (field === 'questions') {
-      newData[index][field] = parseInt(value) || 0;
+      // SECURITY: Validate numeric input
+      try {
+        const numValue = parseInt(value) || 0;
+        chartNumberSchema.parse(numValue);
+        newData[index][field] = numValue;
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          toast.error(`Invalid number: ${error.errors[0].message}`);
+          return;
+        }
+      }
     } else {
       newData[index][field] = value;
     }

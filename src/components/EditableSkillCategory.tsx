@@ -4,6 +4,9 @@ import { useEditMode } from '@/contexts/EditModeContext';
 import { useContentSync } from '@/contexts/ContentSyncContext';
 import { Button } from './ui/button';
 import { EditableText } from './EditableText';
+import { skillCategorySchema } from '@/lib/validation-schemas';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 export interface Skill {
   id: string;
@@ -37,9 +40,17 @@ export function EditableSkillCategory({ storageKey, initialCategories, icons }: 
   }, [storageKey]);
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(categories));
-    syncContent(storageKey, categories);
-    setHasUnsavedChanges(true);
+    // SECURITY: Validate skill categories before saving
+    try {
+      z.array(skillCategorySchema).parse(categories);
+      localStorage.setItem(storageKey, JSON.stringify(categories));
+      syncContent(storageKey, categories);
+      setHasUnsavedChanges(true);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(`Invalid skill data: ${error.errors[0].message}`);
+      }
+    }
   }, [categories, storageKey, setHasUnsavedChanges, syncContent]);
 
   const addSkillToCategory = (categoryId: string) => {

@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useEditMode } from '@/contexts/EditModeContext';
 import { useContentSync } from '@/contexts/ContentSyncContext';
 import { cn } from '@/lib/utils';
+import { textContentSchema, shortTextSchema } from '@/lib/validation-schemas';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 interface EditableTextProps {
   id: string;
@@ -48,11 +51,27 @@ export function EditableText({
     setIsEditing(false);
     if (textRef.current) {
       const newValue = textRef.current.textContent || placeholder;
-      setValue(newValue);
-      const storageKey = `editable_${id}`;
-      localStorage.setItem(storageKey, newValue);
-      syncContent(storageKey, newValue);
-      setHasUnsavedChanges(true);
+      
+      // SECURITY: Validate input before saving
+      try {
+        // Use appropriate schema based on content length expectation
+        const schema = as === 'h1' || as === 'h2' || as === 'h3' ? shortTextSchema : textContentSchema;
+        const validated = schema.parse(newValue);
+        
+        setValue(validated);
+        const storageKey = `editable_${id}`;
+        localStorage.setItem(storageKey, validated);
+        syncContent(storageKey, validated);
+        setHasUnsavedChanges(true);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          toast.error(`Validation error: ${error.errors[0].message}`);
+          // Revert to previous valid value
+          if (textRef.current) {
+            textRef.current.textContent = value;
+          }
+        }
+      }
     }
   };
 

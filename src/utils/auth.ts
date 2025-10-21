@@ -1,9 +1,15 @@
 // Firebase Authentication utilities
 import { signInWithPopup, signOut as firebaseSignOut, User } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
+import { logger } from '@/lib/logger';
 
-// Public backend URL (optional). If unavailable, we simply skip backend verification.
+// SECURITY: Validate backend URL
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+
+// SECURITY: Enforce HTTPS in production
+if (BACKEND_URL && import.meta.env.PROD && !BACKEND_URL.startsWith('https://')) {
+  throw new Error('SECURITY ERROR: Backend URL must use HTTPS in production');
+}
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -17,25 +23,18 @@ export const signInWithGoogle = async (): Promise<{ success: boolean; error?: st
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
 
-    // Try backend verification if configured; ignore failure (Option A relies on rules)
-    if (BACKEND_URL) {
-      try {
-        const idToken = await user.getIdToken();
-        await fetch(`${BACKEND_URL}/api/auth/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken })
-        }).catch(() => void 0);
-      } catch {
-        // ignore errors
-      }
-    }
+    // SECURITY NOTE: Backend verification removed (Option A - rely on Firestore rules)
+    // Backend verification was not being used, creating false sense of security.
+    // All authorization is now enforced entirely by Firestore rules.
+    // If you need backend verification, implement proper session management.
 
-    // Force-refresh to get latest claims (email/email_verified)
+    // Force-refresh to get latest claims
     await user.getIdToken(true);
     return { success: true };
   } catch (error: any) {
-    console.error('Google sign-in error:', error);
+    // SECURITY: Use secure logger (dev-only, redacts sensitive data)
+    logger.error('Google sign-in error:', error);
+    
     try { await firebaseSignOut(auth); } catch {}
     return {
       success: false,
@@ -44,6 +43,9 @@ export const signInWithGoogle = async (): Promise<{ success: boolean; error?: st
   }
 };
 
+// SECURITY NOTE: viewer_session is a UX-only flag for client-side UI
+// It does NOT grant any permissions - all security is enforced by Firestore rules
+// This flag can be manipulated via browser console and has zero security value
 export const signInAsViewer = (): void => {
   localStorage.setItem('viewer_session', 'active');
 };

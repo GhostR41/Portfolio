@@ -46,7 +46,7 @@ export function TerminalChat() {
           response = "Frontend: React, TypeScript | Backend: Node.js, PostgreSQL | Cloud: AWS";
           break;
         case "contact":
-          response = "Email: agent@tactical-ops.com | GitHub: @yourusername";
+          response = "Email: your.email@example.com | GitHub: @yourusername | Replace these in src/components/TerminalChat.tsx";
           break;
         case "secret":
           response = "ACCESS GRANTED: Passionate about building elegant solutions to complex problems.";

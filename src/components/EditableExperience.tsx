@@ -4,6 +4,9 @@ import { useEditMode } from '@/contexts/EditModeContext';
 import { useContentSync } from '@/contexts/ContentSyncContext';
 import { Button } from './ui/button';
 import { EditableText } from './EditableText';
+import { experienceSchema } from '@/lib/validation-schemas';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 export interface Experience {
   id: string;
@@ -31,9 +34,17 @@ export function EditableExperience({ storageKey, initialExperiences }: EditableE
   }, [storageKey]);
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(experiences));
-    syncContent(storageKey, experiences);
-    setHasUnsavedChanges(true);
+    // SECURITY: Validate experience data before saving
+    try {
+      z.array(experienceSchema).parse(experiences);
+      localStorage.setItem(storageKey, JSON.stringify(experiences));
+      syncContent(storageKey, experiences);
+      setHasUnsavedChanges(true);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(`Invalid experience data: ${error.errors[0].message}`);
+      }
+    }
   }, [experiences, storageKey, setHasUnsavedChanges, syncContent]);
 
   const addNewExperience = () => {

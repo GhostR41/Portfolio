@@ -4,6 +4,9 @@ import { useEditMode } from '@/contexts/EditModeContext';
 import { useContentSync } from '@/contexts/ContentSyncContext';
 import { Button } from './ui/button';
 import { EditableText } from './EditableText';
+import { projectSchema, urlSchema } from '@/lib/validation-schemas';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 export interface Project {
   id: string;
@@ -45,12 +48,40 @@ export function EditableProjectCard({ storageKey, initialProjects }: EditablePro
     const updatedProjects = projects.map(project => {
       const savedLink = localStorage.getItem(`${project.id}_link`);
       const savedGithub = localStorage.getItem(`${project.id}_github`);
+      
+      // SECURITY: Validate URLs before saving
+      let validatedLink = project.link;
+      let validatedGithub = project.github;
+      
+      if (savedLink && savedLink !== 'https://') {
+        try {
+          urlSchema.parse(savedLink);
+          validatedLink = savedLink;
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            toast.error(`Invalid project link URL: ${error.errors[0].message}`);
+          }
+        }
+      }
+      
+      if (savedGithub && savedGithub !== 'https://github.com/') {
+        try {
+          urlSchema.parse(savedGithub);
+          validatedGithub = savedGithub;
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            toast.error(`Invalid GitHub URL: ${error.errors[0].message}`);
+          }
+        }
+      }
+      
       return {
         ...project,
-        link: savedLink || project.link,
-        github: savedGithub || project.github,
+        link: validatedLink,
+        github: validatedGithub,
       };
     });
+    
     localStorage.setItem(storageKey, JSON.stringify(updatedProjects));
     syncContent(storageKey, updatedProjects);
     setHasUnsavedChanges(true);

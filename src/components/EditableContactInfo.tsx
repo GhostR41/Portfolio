@@ -4,6 +4,9 @@ import { useEditMode } from '@/contexts/EditModeContext';
 import { useContentSync } from '@/contexts/ContentSyncContext';
 import { Button } from './ui/button';
 import { EditableText } from './EditableText';
+import { contactInfoSchema } from '@/lib/validation-schemas';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 export interface ContactInfoItem {
   id: string;
@@ -32,9 +35,17 @@ export function EditableContactInfo({ storageKey, initialItems, icons }: Editabl
   }, [storageKey]);
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(items));
-    syncContent(storageKey, items);
-    setHasUnsavedChanges(true);
+    // SECURITY: Validate contact info before saving
+    try {
+      z.array(contactInfoSchema).parse(items);
+      localStorage.setItem(storageKey, JSON.stringify(items));
+      syncContent(storageKey, items);
+      setHasUnsavedChanges(true);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(`Invalid contact info: ${error.errors[0].message}`);
+      }
+    }
   }, [items, storageKey, setHasUnsavedChanges, syncContent]);
 
   const addNewItem = () => {
